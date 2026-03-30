@@ -9,6 +9,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 
+import java.time.*;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -69,16 +70,30 @@ public class CallLogService {
     }
 
     public Dto.StatsResponse getStats() {
+        // All-time stats
         long totalCalls = repository.count();
         long incomingCalls = repository.countByCallType(CallLog.CallType.INCOMING);
         long outgoingCalls = repository.countByCallType(CallLog.CallType.OUTGOING);
         long missedCalls = repository.countByCallType(CallLog.CallType.MISSED);
 
-        double avgDuration = repository.findAll().stream()
-                .filter(c -> c.getDuration() != null)
-                .mapToLong(CallLog::getDuration)
-                .average()
-                .orElse(0.0);
+        // Use efficient DB query instead of loading all records into memory
+        double avgDuration = repository.findAverageDuration();
+
+        // All-time total talk time
+        long totalTalkTimeSeconds = repository.findTotalDurationSince(0L);
+
+        // Today's stats — start of today in IST (UTC+5:30)
+        ZoneId istZone = ZoneId.of("Asia/Kolkata");
+        long startOfTodayMs = LocalDate.now(istZone)
+                .atStartOfDay(istZone)
+                .toInstant()
+                .toEpochMilli();
+
+        long todayTotalCalls = repository.countCallsSince(startOfTodayMs);
+        long todayIncomingCalls = repository.countCallsSinceByType(startOfTodayMs, CallLog.CallType.INCOMING);
+        long todayOutgoingCalls = repository.countCallsSinceByType(startOfTodayMs, CallLog.CallType.OUTGOING);
+        long todayMissedCalls = repository.countCallsSinceByType(startOfTodayMs, CallLog.CallType.MISSED);
+        long todayTalkTimeSeconds = repository.findTotalDurationSince(startOfTodayMs);
 
         List<Dto.DeviceInfo> devices = repository.countByDevice().stream()
                 .map(row -> Dto.DeviceInfo.builder()
@@ -93,6 +108,12 @@ public class CallLogService {
                 .outgoingCalls(outgoingCalls)
                 .missedCalls(missedCalls)
                 .avgDurationSeconds(avgDuration)
+                .totalTalkTimeSeconds(totalTalkTimeSeconds)
+                .todayTotalCalls(todayTotalCalls)
+                .todayIncomingCalls(todayIncomingCalls)
+                .todayOutgoingCalls(todayOutgoingCalls)
+                .todayMissedCalls(todayMissedCalls)
+                .todayTalkTimeSeconds(todayTalkTimeSeconds)
                 .devices(devices)
                 .build();
     }

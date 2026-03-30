@@ -59,6 +59,14 @@ public class Dto {
         private long missedCalls;
         private double avgDurationSeconds;
         private List<DeviceInfo> devices;
+
+        // NEW: Today's analytics
+        private long todayTotalCalls;
+        private long todayIncomingCalls;
+        private long todayOutgoingCalls;
+        private long todayMissedCalls;
+        private long todayTalkTimeSeconds;   // Total seconds spoken today
+        private long totalTalkTimeSeconds;   // Total seconds spoken all time
     }
 
     @Data
